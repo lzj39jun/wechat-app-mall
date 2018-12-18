@@ -4,6 +4,7 @@
 		"urlCheck": true,
 		"es6": true,
 		"postcss": true,
+		"postcss": false,
 		"minified": true,
 		"newFeature": true
 	},
@@ -11,12 +12,21 @@
 	"libVersion": "1.6.4",
 	"appid": "wx6e9535f82936088e",
 	"projectname": "%E4%B8%80%E5%8F%B6%E7%BB%A3",
+	"scripts": {},
 	"condition": {
 		"search": {
 			"current": -1,
 			"list": []
 		},
 		"conversation": {
+			"current": -1,
+			"list": []
+		},
+		"game": {
+			"current": -1,
+			"list": []
+		},
+		"plugin": {
 			"current": -1,
 			"list": []
 		},

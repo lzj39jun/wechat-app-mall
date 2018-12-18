@@ -6,9 +6,9 @@ function wxpay(app, money, orderId, redirectUrl) {
     nextAction = { type: 0, id: orderId };
   }
   wx.request({
-    url: 'https://api.it120.cc/' + app.globalData.subDomain + '/pay/wxapp/get-pay-data',
+    url: 'https://api.it120.cc/' + app.globalData.subDomain + '/pay/wx/wxapp',
     data: {
-      token:app.globalData.token,
+      token: wx.getStorageSync('token'),
       money:money,
       remark: remark,
       payName:"在线支付",
@@ -35,7 +35,14 @@ function wxpay(app, money, orderId, redirectUrl) {
           }
         })
       } else {
-        wx.showToast({ title: '服务器忙' + res.data.code + res.data.msg})
+        wx.showModal({
+          title: '出错了',
+          content: res.data.code + ':' + res.data.msg + ':' + res.data.data,
+          showCancel: false,
+          success: function (res) {
+
+          }
+        })
       }
     }
   })

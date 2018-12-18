@@ -8,23 +8,35 @@ Page({
     userInfo: {}
   },
   goToIndex:function(){
-    wx.switchTab({
-      url: '/pages/index/index',
-    });
+    if (app.globalData.isConnected) {
+      wx.switchTab({
+        url: '/pages/index/index',
+      });
+    } else {
+      wx.showToast({
+        title: '当前无网络',
+        icon: 'none',
+      })
+    }
   },
   onLoad:function(){
     var that = this
     wx.setNavigationBarTitle({
       title: wx.getStorageSync('mallName')
     })
-    app.getUserInfo(function(userInfo){
+  },
+  onShow:function(){
+    let that = this
+    let userInfo = wx.getStorageSync('userInfo')
+    if (!userInfo) {
+      wx.navigateTo({
+        url: "/pages/authorize/index"
+      })
+    } else {
       that.setData({
         userInfo: userInfo
       })
-    })
-  },
-  onShow:function(){
-
+    }
   },
   onReady: function(){
     var that = this;

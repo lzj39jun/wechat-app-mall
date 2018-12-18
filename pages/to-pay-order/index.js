@@ -12,6 +12,7 @@ Page({
     allGoodsAndYunPrice:0,
     goodsJsonStr:"",
     orderType:"", //订单类型，购物车下单或立即支付下单，默认是购物车，
+    pingtuanOpenId:undefined, //拼团的话记录团号
 
     hasNoCoupons: true,
     coupons: [],
@@ -24,12 +25,14 @@ Page({
     //立即购买下单
     if ("buyNow"==that.data.orderType){
       var buyNowInfoMem = wx.getStorageSync('buyNowInfo');
+      that.data.kjId = buyNowInfoMem.kjId;
       if (buyNowInfoMem && buyNowInfoMem.shopList) {
         shopList = buyNowInfoMem.shopList
       }
     }else{
       //购物车下单
       var shopCarInfoMem = wx.getStorageSync('shopCarInfo');
+      that.data.kjId = shopCarInfoMem.kjId;
       if (shopCarInfoMem && shopCarInfoMem.shopList) {
         // shopList = shopCarInfoMem.shopList
         shopList = shopCarInfoMem.shopList.filter(entity => {
@@ -44,11 +47,10 @@ Page({
   },
 
   onLoad: function (e) {
-    var that = this;
-    //显示收货地址标识
-    that.setData({
+    this.setData({
       isNeedLogistics: 1,
-      orderType: e.orderType
+      orderType: e.orderType,
+      pingtuanOpenId: e.pingtuanOpenId
     });
   },
 
@@ -65,7 +67,7 @@ Page({
   createOrder:function (e) {
     wx.showLoading();
     var that = this;
-    var loginToken = app.globalData.token // 用户登录 token
+    var loginToken = wx.getStorageSync('token') // 用户登录 token
     var remark = ""; // 备注信息
     if (e) {
       remark = e.detail.value.remark; // 备注信息
@@ -76,6 +78,12 @@ Page({
       goodsJsonStr: that.data.goodsJsonStr,
       remark: remark
     };
+    if (that.data.kjId) {
+      postData.kjid = that.data.kjId
+    }
+    if (that.data.pingtuanOpenId) {
+      postData.pingtuanOpenId = that.data.pingtuanOpenId
+    }
     if (that.data.isNeedLogistics > 0) {
       if (!that.data.curAddressData) {
         wx.hideLoading();
@@ -166,7 +174,7 @@ Page({
     wx.request({
       url: 'https://api.it120.cc/'+ app.globalData.subDomain +'/user/shipping-address/default',
       data: {
-        token:app.globalData.token
+        token: wx.getStorageSync('token')
       },
       success: (res) =>{
         if (res.data.code == 0) {
@@ -237,7 +245,7 @@ Page({
     wx.request({
       url: 'https://api.it120.cc/' + app.globalData.subDomain + '/discounts/my',
       data: {
-        token: app.globalData.token,
+        token: wx.getStorageSync('token'),
         status:0
       },
       success: function (res) {

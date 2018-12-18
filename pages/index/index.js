@@ -1,4 +1,5 @@
 //index.js
+const api = require('../../utils/request.js')
 //获取应用实例
 var app = getApp()
 Page({
@@ -14,17 +15,21 @@ Page({
     categories: [],
     activeCategoryId: 0,
     goods:[],
-    scrollTop:"0",
+    scrollTop:0,
     loadingMoreHidden:true,
 
     hasNoCoupons:true,
     coupons: [],
     searchInput: '',
+
+    curPage:1,
+    pageSize:20
   },
 
   tabClick: function (e) {
     this.setData({
-      activeCategoryId: e.currentTarget.id
+      activeCategoryId: e.currentTarget.id,
+      curPage: 1
     });
     this.getGoodsList(this.data.activeCategoryId);
   },
@@ -52,48 +57,53 @@ Page({
         selectCurrent: e.index  
     })  
   },
-  scroll: function (e) {
-    //  console.log(e) ;
-    var that = this,scrollTop=that.data.scrollTop;
-    that.setData({
-      scrollTop:e.detail.scrollTop
-    })
-    // console.log('e.detail.scrollTop:'+e.detail.scrollTop) ;
-    // console.log('scrollTop:'+scrollTop)
-  },
   onLoad: function () {
     var that = this
     wx.setNavigationBarTitle({
       title: wx.getStorageSync('mallName')
     })
-    /*
-    //调用应用实例的方法获取全局数据
-    app.getUserInfo(function(userInfo){
-      //更新数据
-      that.setData({
-        userInfo:userInfo
+    /**
+     * 示例：
+     * 调用接口封装方法
+     */
+    api.fetchRequest('/banner/list', {key: 'mallName'}).then(function (res) {
+      if (res.data.code == 404) {
+        wx.showModal({
+          title: '提示',
+          content: '请在后台添加 banner 轮播图片',
+          showCancel: false
+        })
+      } else {
+        that.setData({
+          banners: res.data.data
+        });
+      }
+    }).catch(function (res) {
+      wx.showToast({
+        title: res.data.msg,
+        icon: 'none'
       })
     })
-    */
-    wx.request({
-      url: 'https://api.it120.cc/' + app.globalData.subDomain + '/banner/list',
-      data: {
-        key: 'mallName'
-      },
-      success: function(res) {
-        if (res.data.code == 404) {
-          wx.showModal({
-            title: '提示',
-            content: '请在后台添加 banner 轮播图片',
-            showCancel: false
-          })
-        } else {
-          that.setData({
-            banners: res.data.data
-          });
-        }
-      }
-    })
+    // 原请求方式
+    // wx.request({
+    //   url: 'https://api.it120.cc/' + app.globalData.subDomain + '/banner/list',
+    //   data: {
+    //     key: 'mallName'
+    //   },
+      // success: function(res) {
+      //   if (res.data.code == 404) {
+      //     wx.showModal({
+      //       title: '提示',
+      //       content: '请在后台添加 banner 轮播图片',
+      //       showCancel: false
+      //     })
+      //   } else {
+      //     that.setData({
+      //       banners: res.data.data
+      //     });
+      //   }
+    //   }
+    // }),
     wx.request({
       url: 'https://api.it120.cc/'+ app.globalData.subDomain +'/shop/goods/category/all',
       success: function(res) {
@@ -105,7 +115,8 @@ Page({
         }
         that.setData({
           categories:categories,
-          activeCategoryId:0
+          activeCategoryId:0,
+          curPage: 1
         });
         that.getGoodsList(0);
       }
@@ -113,34 +124,47 @@ Page({
     that.getCoupons ();
     that.getNotice ();
   },
-  getGoodsList: function (categoryId) {
+  onPageScroll(e) {
+    let scrollTop = this.data.scrollTop
+    this.setData({
+      scrollTop: e.scrollTop
+    })
+   },
+  getGoodsList: function (categoryId, append) {
     if (categoryId == 0) {
       categoryId = "";
     }
-    console.log(categoryId)
     var that = this;
+    wx.showLoading({
+      "mask":true
+    })
     wx.request({
       url: 'https://api.it120.cc/'+ app.globalData.subDomain +'/shop/goods/list',
       data: {
         categoryId: categoryId,
-        nameLike: that.data.searchInput
+        nameLike: that.data.searchInput,
+        page: this.data.curPage,
+        pageSize: this.data.pageSize
       },
       success: function(res) {
-        that.setData({
-          goods:[],
-          loadingMoreHidden:true
-        });
-        var goods = [];
-        if (res.data.code != 0 || res.data.data.length == 0) {
-          that.setData({
-            loadingMoreHidden:false,
-          });
-          return;
+        wx.hideLoading()        
+        if (res.data.code == 404 || res.data.code == 700){
+          let newData = { loadingMoreHidden: false }
+          if (!append) {
+            newData.goods = []
+          }
+          that.setData(newData);
+          return
         }
+        let goods = [];
+        if (append) {
+          goods = that.data.goods
+        }        
         for(var i=0;i<res.data.data.length;i++){
           goods.push(res.data.data[i]);
         }
         that.setData({
+          loadingMoreHidden: true,
           goods:goods,
         });
       }
@@ -169,7 +193,7 @@ Page({
       url: 'https://api.it120.cc/' + app.globalData.subDomain + '/discounts/fetch',
       data: {
         id: e.currentTarget.dataset.id,
-        token: app.globalData.token
+        token: wx.getStorageSync('token')
       },
       success: function (res) {
         if (res.data.code == 20001 || res.data.code == 20002) {
@@ -253,6 +277,21 @@ Page({
 
   },
   toSearch : function (){
+    this.setData({
+      curPage: 1
+    });
     this.getGoodsList(this.data.activeCategoryId);
+  },
+  onReachBottom: function () {
+    this.setData({
+      curPage: this.data.curPage+1
+    });
+    this.getGoodsList(this.data.activeCategoryId, true)
+  },
+  onPullDownRefresh: function(){
+    this.setData({
+      curPage: 1
+    });
+    this.getGoodsList(this.data.activeCategoryId)
   }
 })

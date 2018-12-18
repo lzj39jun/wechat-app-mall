@@ -2,6 +2,43 @@
 App({
   onLaunch: function () {
     var that = this;
+    /**
+   * 初次加载判断网络情况
+   * 无网络状态下根据实际情况进行调整
+   */
+    wx.getNetworkType({
+      success(res) {
+        const networkType = res.networkType
+        if (networkType === 'none') {
+          that.globalData.isConnected = false
+          wx.showToast({
+            title: '当前无网络',
+            icon: 'loading',
+            duration: 2000
+          })
+        }
+      }
+    });
+    /**
+     * 监听网络状态变化
+     * 可根据业务需求进行调整
+     */
+    wx.onNetworkStatusChange(function (res) {
+      if (!res.isConnected) {
+        that.globalData.isConnected = false
+        wx.showToast({
+          title: '网络已断开',
+          icon: 'loading',
+          duration: 2000,
+          complete: function() {
+            that.goStartIndexPage()
+          }
+        })
+      } else {
+        that.globalData.isConnected = true
+        wx.hideToast()
+      }
+    });       
     //  获取商城名称
     wx.request({
       url: 'https://api.it120.cc/'+ that.globalData.subDomain +'/config/get-value',
@@ -46,77 +83,22 @@ App({
         }
       }
     })
-    this.login();
-  },
-  login : function () {
-    var that = this;
-    var token = that.globalData.token;
-    if (token) {
-      wx.request({
-        url: 'https://api.it120.cc/' + that.globalData.subDomain + '/user/check-token',
-        data: {
-          token: token
-        },
-        success: function (res) {
-          if (res.data.code != 0) {
-            that.globalData.token = null;
-            that.login();
-          }
-        }
-      })
-      return;
+    // 判断是否登录
+    let token = wx.getStorageSync('token');
+    if (!token) {
+      that.goLoginPageTimeOut()
+      return
     }
-    wx.login({
+    wx.request({
+      url: 'https://api.it120.cc/' + that.globalData.subDomain + '/user/check-token',
+      data: {
+        token: token
+      },
       success: function (res) {
-        wx.request({
-          url: 'https://api.it120.cc/'+ that.globalData.subDomain +'/user/wxapp/login',
-          data: {
-            code: res.code
-          },
-          success: function(res) {
-            if (res.data.code == 10000) {
-              // 去注册
-              that.registerUser();
-              return;
-            }
-            if (res.data.code != 0) {
-              // 登录错误
-              wx.hideLoading();
-              wx.showModal({
-                title: '提示',
-                content: '无法登录，请重试',
-                showCancel:false
-              })
-              return;
-            }
-            //console.log(res.data.data)
-            that.globalData.token = res.data.data.token;
-            that.globalData.uid = res.data.data.uid;
-          }
-        })
-      }
-    })
-  },
-  registerUser: function () {
-    var that = this;
-    wx.login({
-      success: function (res) {
-        var code = res.code; // 微信登录接口返回的 code 参数，下面注册接口需要用到
-        wx.getUserInfo({
-          success: function (res) {
-            var iv = res.iv;
-            var encryptedData = res.encryptedData;
-            // 下面开始调用注册接口
-            wx.request({
-              url: 'https://api.it120.cc/' + that.globalData.subDomain +'/user/wxapp/register/complex',
-              data: {code:code,encryptedData:encryptedData,iv:iv}, // 设置请求的 参数
-              success: (res) =>{
-                wx.hideLoading();
-                that.login();
-              }
-            })
-          }
-        })
+        if (res.data.code != 0) {
+          wx.removeStorageSync('token')
+          that.goLoginPageTimeOut()
+        }
       }
     })
   },
@@ -129,7 +111,7 @@ App({
         'content-type': 'application/x-www-form-urlencoded'
       },
       data: {
-        token: that.globalData.token,
+        token: wx.getStorageSync('token'),
         type:0,
         module:'order',
         business_id: orderId,
@@ -155,7 +137,7 @@ App({
         'content-type': 'application/x-www-form-urlencoded'
       },
       data: {
-        token: that.globalData.token,
+        token: wx.getStorageSync('token'),
         type: 0,
         module: 'immediately',
         template_id: template_id,
@@ -167,31 +149,31 @@ App({
         console.log(res.data);
       }
     })
-  },
-  getUserInfo: function (cb) {
-    var that = this
-    if (this.globalData.userInfo) {
-      typeof cb == "function" && cb(this.globalData.userInfo)
-    } else {
-      //调用登陆接口
-      wx.login({
-        success: function () {
-          wx.getUserInfo({
-            success: function (res) {
-              that.globalData.userInfo = res.userInfo
-              typeof cb == "function" && cb(that.globalData.userInfo)
-            }
-          })
-        }
+  },  
+  goLoginPageTimeOut: function () {
+    setTimeout(function(){
+      wx.navigateTo({
+        url: "/pages/authorize/index"
       })
-    }
-
+    }, 1000)    
+  },
+  goStartIndexPage: function () {
+    setTimeout(function () {
+      wx.redirectTo({
+        url: "/pages/start/start"
+      })
+    }, 1000)
   },
   globalData:{
     userInfo:null,
     subDomain: "yiyexiu", // 如果你的域名是： https://api.it120.cc/abcd 那么这里只要填写 abcd
-    version: "1.0.1",
-    shareProfile: '百款精品商品，总有一款适合您' // 首页转发的时候话术
+    subDomain: "tz", // 如果你的域名是： https://api.it120.cc/abcd 那么这里只要填写 abcd
+    version: "1.0.3",
+    note:'增加小程序购物单支持',
+    appid: "wx6e9535f82936088e", // 您的小程序的appid
+    shareProfile: '一叶绣女神馆，你的变美专家', // 首页转发的时候话术
+    isConnected: true, // 网络是否连接
+    _path: 'https://api.it120.cc/tz' // 原项目路由配置在页面中，改为配置项
   }
   /*
   根据自己需要修改下单时候的模板消息内容设置，可增加关闭订单、收货时候模板消息提醒；
